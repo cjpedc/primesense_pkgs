@@ -114,6 +114,9 @@ void ObjectFinder::findObjects(){
     }
 
     objectsPub.publish(object_pos);
+    //ugly hack to get several pointclouds with similar timestamp
+    objectsPub.publish(object_pos);
+    objectsPub.publish(object_pos);
 
     return;
 }

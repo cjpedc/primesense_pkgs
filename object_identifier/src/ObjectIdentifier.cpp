@@ -18,6 +18,11 @@ ObjectIdentifier::ObjectIdentifier(){
     positionSub->registerCallback(&ObjectIdentifier::positionCallback, this);
     synchronizer = new message_filters::TimeSynchronizer<sensor_msgs::PointCloud2, object_finder::Positions>(*cloudSub, *positionSub, 1000);
     synchronizer->registerCallback(&ObjectIdentifier::cloudPositionCallback, this);
+    syncPolicy tempPolicyObj = syncPolicy(100);
+    tempPolicyObj.setMaxIntervalDuration(ros::Duration(0.15));
+    const syncPolicy policyObj = syncPolicy(tempPolicyObj);
+    approxSynchronizer = new message_filters::Synchronizer<syncPolicy>(policyObj, *cloudSub, *positionSub);
+    approxSynchronizer->registerCallback(&ObjectIdentifier::approxCallback, this);
 
     objectPub = nh.advertise<object_identifier::Objects>("/object_identifier/objects", 1);
     debugPub = nh.advertise<sensor_msgs::PointCloud2>("/object_identifier/debug", 1);
@@ -42,14 +47,14 @@ void ObjectIdentifier::identifyObjects(){
 }
 
 void ObjectIdentifier::cloudCallback(const sensor_msgs::PointCloud2::ConstPtr &msg){
-    ROS_INFO("received cloud");
+    ROS_INFO("received cloud: [%u.%u]", msg->header.stamp.sec, msg->header.stamp.nsec);
 
 //    pcl::fromROSMsg(*msg, *inputCloud);
     return;
 }
 
 void ObjectIdentifier::positionCallback(const object_finder::Positions::ConstPtr &msg){
-    ROS_INFO("received positions");
+    ROS_INFO("received positions: [%u.%u]", msg->header.stamp.sec, msg->header.stamp.nsec);
 
 //    objectPositions = std::vector<pcl::PointXYZ>(msg->object_positions.size());
 
@@ -77,6 +82,14 @@ void ObjectIdentifier::cloudPositionCallback(const sensor_msgs::PointCloud2::Con
     return;
 }
 
+void ObjectIdentifier::approxCallback(const sensor_msgs::PointCloud2::ConstPtr &cloudMsg, const object_finder::Positions::ConstPtr &posMsg){
+    ROS_INFO("reveiced approximate cloud + positions");
+    ROS_INFO("cloud ts: %u.%u", cloudMsg->header.stamp.sec, cloudMsg->header.stamp.nsec);
+    ROS_INFO("position ts: %u.%u", posMsg->header.stamp.sec, posMsg->header.stamp.nsec);
+    return;
+}
+
+
 void ObjectIdentifier::extractObjectClouds(){
 
     pcl::CropBox<POINTTYPE> cb;
@@ -93,7 +106,7 @@ void ObjectIdentifier::extractObjectClouds(){
     }
 
     if(objectClouds.size() > 0){
-        ROS_INFO("sending cloud of first object");
+//        ROS_INFO("sending cloud of first object");
         sensor_msgs::PointCloud2 msg;
         pcl::toROSMsg(*objectClouds[0], msg);
         debugPub.publish(msg);
